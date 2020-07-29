@@ -58,14 +58,11 @@ app.get('/authorize', (req, res) => {
 	const client = clients[clientID];
 
 	if (!client) {
-		res.status(401).send("Error: client not authorized")
+		res.status(401).end()
 		return
 	}
-	if (
-		typeof req.query.scope !== "string" ||
-		!containsAll(client.scopes, req.query.scope.split(" "))
-	) {
-		res.status(401).send("Error: invalid scopes requested")
+	if (!containsAll(client.scopes, req.query.scope.split(" "))) {
+		res.status(401).end()
 		return
 	}
 	const requestId = randomString();
