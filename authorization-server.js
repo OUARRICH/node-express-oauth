@@ -55,20 +55,30 @@ Your code here
 */
 app.get('/authorize', (req, res) => {
 	const clientID = req.query.client_id;
-	if(!clients.hasOwnProperty(clientID)){
-		res.status(401).end();
+	const client = clients[clientID];
+
+	if (!client) {
+		res.status(401).send("Error: client not authorized")
+		return
 	}
-	if(!containsAll(clients[clientID].scopes, req.query.scope.split(" "))){
-		res.status(401).end();
+	if (
+		typeof req.query.scope !== "string" ||
+		!containsAll(client.scopes, req.query.scope.split(" "))
+	) {
+		res.status(401).send("Error: invalid scopes requested")
+		return
 	}
-	const rs = randomString();
-	requests[rs] = req.query;
-	res.status(200).render('login', {
-		client: clients[clientID],
+	const requestId = randomString();
+	requests[requestId] = req.query;
+
+	res.render('login', {
+		client,
 		scope: req.query.scope,
-		requestId: rs
+		requestId
 	});
 });
+
+
 
 const server = app.listen(config.port, "localhost", function () {
 	var host = server.address().address
