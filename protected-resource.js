@@ -1,6 +1,7 @@
 const express = require("express")
 const bodyParser = require("body-parser")
 const fs = require("fs")
+const jwt = require('jsonwebtoken')
 const { timeout } = require("./utils")
 
 const config = {
@@ -31,6 +32,33 @@ app.use(bodyParser.urlencoded({ extended: true }))
 /*
 Your code here
 */
+app.get('/user-info', (req, res) => {
+	if(!req.headers.authorization) {
+		res.status(401).end();
+		return;
+	}
+	const token = req.headers.authorization.slice('Bearer'.length+1);
+	let payload;
+	try{
+		payload = jwt.verify(token, config.publicKey, {
+			algorithms: ['RS256']
+		});
+	}catch(e){
+		res.status(401).end();
+		return
+	}
+	const { userName, scope } = payload;
+	const user = users[userName];
+	let permisssions = scope.split(' ');
+	permisssions = permisssions.map(permission => permission.slice('permission:'.length));
+	const userIfo = permisssions.reduce((acc, value) => {
+		return {
+			...acc,
+			[value]: user[value]
+		}
+	}, {});
+	res.status(200).json(userIfo);
+});
 
 const server = app.listen(config.port, "localhost", function () {
 	var host = server.address().address
