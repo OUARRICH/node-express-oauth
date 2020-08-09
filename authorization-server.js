@@ -2,6 +2,7 @@ const fs = require("fs")
 const express = require("express")
 const bodyParser = require("body-parser")
 const jwt = require("jsonwebtoken")
+const url = require('url')
 const {
 	randomString,
 	containsAll,
@@ -75,7 +76,72 @@ app.get('/authorize', (req, res) => {
 	});
 });
 
+app.post('/approve', (req, res) => {
+	const { userName, password, requestId } = req.body;
 
+	if(users[userName] !== password) {
+		res.status(401).end();
+		return;
+	}
+	if(!requests[requestId]) {
+		res.status(401).end();
+		return;
+	}
+	const clientReq = requests[requestId];
+	delete requests[requestId];
+	const rs = randomString();
+	authorizationCodes[rs] = {
+		clientReq,
+		userName
+	};
+	const redirectUri = url.parse(clientReq.redirect_uri);
+	redirectUri.query = {
+		code: rs,
+		state: clientReq.state
+	};
+	res.redirect(url.format(redirectUri));
+});
+
+app.post('/token', (req, res) => {
+	const auth = req.headers.authorization;
+	if(!auth) {
+		res.status(401).end();
+		return;
+	}
+	const authCredentials = decodeAuthCredentials(auth);
+	const clientId = Object.keys(clients).find(item => item === authCredentials.clientId);
+	if(!clientId) {
+		res.status(401).end();
+		return;
+	}
+	if(clients[clientId].clientSecret !== authCredentials.clientSecret){
+		res.status(401).end();
+		return;
+	}
+	if(!authorizationCodes[req.body.code]){
+		res.status(401).end();
+		return;
+	}
+	const obj = authorizationCodes[req.body.code];
+	delete authorizationCodes[req.body.code];
+	
+	const token = jwt.sign(
+		{
+			userName: obj.userName,
+			scope: obj.clientReq.scope 
+		},
+		config.privateKey,
+		{
+			'algorithm': 'RS256'
+		}
+	);
+	res.status(200).json(
+		{
+			token_type:'Bearer',
+			access_token: token
+		}
+	);
+});
 
 const server = app.listen(config.port, "localhost", function () {
 	var host = server.address().address
